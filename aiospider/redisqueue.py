@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 # time    : 2019/10/11 6:06 下午
-import asyncio
-import collections
 import pickle
 from asyncio import Queue
-import aioredis
-import redis
-import ujson
 
-from request import Request
+import redis
 
 
 class RedisQueue(Queue):

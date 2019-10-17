@@ -8,7 +8,7 @@ from cchardet import detect
 from httpx import AsyncResponse
 from pyquery import PyQuery
 
-from request import Request
+from aiospider.request import Request
 
 
 class Response:

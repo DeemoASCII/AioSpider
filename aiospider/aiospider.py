@@ -12,11 +12,11 @@ import h11
 import httpx
 import uvloop
 
-from redisqueue import RedisQueue
-from request import Request
-from response import Response
-from utils.log import get_logger
-from utils.retry import retry
+from aiospider.redisqueue import RedisQueue
+from aiospider.request import Request
+from aiospider.response import Response
+from aiospider.utils.log import get_logger
+from aiospider.utils.retry import retry
 
 
 class RemoteException(Exception):
