@@ -35,9 +35,10 @@ class Request(BaseTask):
                  proxy_auth: Optional[BasicAuth] = None,
                  timeout: Union[ClientTimeout, object] = sentinel,
                  verify_ssl: Optional[bool] = None,
-                 etag:int=1
+                 etag: int = 1,
+                 age: int = 60 * 60 * 24 * 2
                  ):
-        super().__init__(priority, dont_filter)
+        super().__init__(priority, dont_filter, age)
         self.method = method.upper()
         if self.method not in METHOD:
             raise InvalidRequestMethod(f"{self.method} method is not supported")

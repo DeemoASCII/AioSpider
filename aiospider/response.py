@@ -31,9 +31,10 @@ class Response(BaseTask):
             status: int = -1,
             callback: Optional[str] = None,
             request: Request,
-            content: bytes
+            content: bytes,
+            age: int
     ):
-        super().__init__(request.priority - 5, request.dont_filter)
+        super().__init__(request.priority - 5, request.dont_filter, age)
         self._callback = callback
         self._url = url
         self._method = method

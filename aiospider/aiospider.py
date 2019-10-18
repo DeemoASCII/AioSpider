@@ -6,6 +6,7 @@ import pickle
 from _signal import SIGINT, SIGTERM
 from asyncio import QueueEmpty
 from inspect import isasyncgen, iscoroutine
+from time import time
 from typing import List, Optional
 
 import aiohttp
@@ -44,6 +45,9 @@ class AioSpider:
             self.dupe_tasks.append(task.taskId)
             await self.queue.put(task)
         elif task.taskId not in self.dupe_tasks:
+            self.dupe_tasks.append(task.taskId)
+            await self.queue.put(task)
+        elif task.expire < int(time()):
             self.dupe_tasks.append(task.taskId)
             await self.queue.put(task)
 
@@ -90,7 +94,7 @@ class AioSpider:
         response = Response(url=str(resp.url), method=resp.method, metadata=req.metadata,
                             cookies=resp.cookies, headers=resp.headers,
                             history=resp.history, status=resp.status,
-                            callback=req.callback, request=req, content=content)
+                            callback=req.callback, request=req, content=content, age=req.age)
         if response.ok:
             self.success_counts += 1
         else:
