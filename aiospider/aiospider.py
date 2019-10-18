@@ -2,25 +2,21 @@
 # encoding: utf-8
 # time    : 2019/10/10 1:45 下午
 import asyncio
-import concurrent
-import json
 import pickle
-import socket
-from typing import List, Dict
+from _signal import SIGINT, SIGTERM
+from asyncio import QueueEmpty
+from inspect import isasyncgen, iscoroutine
+from typing import List, Optional
 
-import h11
-import httpx
+import aiohttp
 import uvloop
+from aiohttp import ClientResponse
 
-from aiospider.redisqueue import RedisQueue
+from aiospider.exceptions import InvalidFunc
+from aiospider.models import BaseTask
 from aiospider.request import Request
 from aiospider.response import Response
 from aiospider.utils.log import get_logger
-from aiospider.utils.retry import retry
-
-
-class RemoteException(Exception):
-    pass
 
 
 class AioSpider:
@@ -35,13 +31,15 @@ class AioSpider:
 
     def __init__(self):
         self.queue = None
-        self.client: httpx.AsyncClient = httpx.AsyncClient()
+        self.client: Optional[aiohttp.ClientSession] = None
         self.dupe_tasks: List[str] = []
         self.logger = get_logger(name=self.name)
         self.sem = asyncio.Semaphore(self.concurrency)
-        self.task_queue: List[Request] = []
+        self.tasks_queue: List[BaseTask] = []
+        self.failed_counts = 0
+        self.success_counts = 0
 
-    async def add_task(self, task: Request):
+    async def _add_task(self, task: BaseTask):
         if task.dont_filter:
             self.dupe_tasks.append(task.taskId)
             await self.queue.put(task)
@@ -54,110 +52,162 @@ class AioSpider:
             while True:
                 task = await self.queue.get()
                 try:
-                    resp = await self._request(task)
-                    if task.callback:
-                        result = await eval(task.callback)(resp)
-                        if result:
-                            await self.result(result)
-                except KeyboardInterrupt:
-                    self.task_queue.append(task)
-                    self._stop()
-                    raise KeyboardInterrupt
+                    if isinstance(task, Request):
+                        await self._process_request(task)
+                    if isinstance(task, Response):
+                        await self._process_callback(task)
+                    # if isinstance(task, Item):
+                    #     await self._process_item(task)
                 except Exception as e:
-                    self.logger.error(task)
-                    self.logger.exception(e)
+                    raise e
                 finally:
                     self.queue.task_done()
                     await asyncio.sleep(self.request_delay)
 
+    async def _process_request(self, request: Request):
+        response = await self._request(request)
+        await self._add_task(response)
+
+    async def _process_callback(self, response: Response):
+        if response.callback:
+            func = eval(response.callback)
+            callback_result = func(response)
+            if iscoroutine(callback_result):
+                result = await callback_result
+                if result:
+                    await self._add_task(result)
+            elif isasyncgen(callback_result):
+                async for each in func(response):
+                    await self._add_task(each)
+            else:
+                raise InvalidFunc(f'Invalid func type {type(callback_result)}')
+
+    # async def _process_item(self, item: Item):
+    #     pass
+
+    async def _process_response(self, resp: ClientResponse, req: Request):
+        content = await resp.read()
+        response = Response(url=str(resp.url), method=resp.method, metadata=req.metadata,
+                            cookies=resp.cookies, headers=resp.headers,
+                            history=resp.history, status=resp.status,
+                            callback=req.callback, request=req, content=content)
+        if response.ok:
+            self.success_counts += 1
+        else:
+            self.failed_counts += 1
+        return response
+
     async def start(self):
         for url in self.start_urls:
             task = Request(method='get', url=url, callback='self.parse', dont_filter=True, priority=1)
-            await self.add_task(task)
+            yield task
 
-    @retry(httpx.exceptions.ProxyError, concurrent.futures._base.TimeoutError, ConnectionResetError, RemoteException,
-           socket.gaierror, h11._util.RemoteProtocolError, *retry_exceptions,
-           sleep=retry_delay)
-    async def _request(self, task: Request):
-        resp = await self.client.request(
-            method=task.method.upper(), url=task.url, data=task.data, files=task.files,
-            json=task.json, params=task.params, headers=task.headers, stream=task.stream,
-            timeout=task.timeout, auth=task.auth, allow_redirects=task.allow_redirects,
-            proxies=task.proxies, cookies=task.cookies, cert=task.cert, verify=task.verify, trust_env=task.trust_env)
-        await resp.close()
-        if resp.status_code >= 500:
-            self.logger.error(f'遇到了状态码为{resp.status_code}的错误')
-            raise RemoteException()
-        resp = Response(resp=resp, task=task, metadata=task.metadata)
-        return resp
+    # @retry(Exception, sleep=retry_delay)
+    async def _request(self, task: Request) -> Response:
+        async with self.client.request(
+                method=task.method,
+                url=task.url,
+                params=task.params,
+                data=task.data,
+                json=task.json,
+                headers=task.headers,
+                cookies=task.cookies,
+                auth=task.auth,
+                allow_redirects=task.allow_redirects,
+                max_redirects=task.max_redirects,
+                proxy=task.proxy,
+                proxy_auth=task.proxy_auth,
+                verify_ssl=task.verify_ssl
+        ) as resp:
+            response = await self._process_response(resp, task)
+            return response
 
-    async def _memory_main(self):
-        self.logger.info('爬虫启动！！！！！使用内存队列..')
+    async def _main(self):
+        self.logger.info('AioSpider started！！！！！Use memory queue..')
+        self.loop = asyncio.get_event_loop()
         self.queue = asyncio.PriorityQueue(maxsize=1000000)
-        if self.task_queue:
-            for task in self.task_queue:
-                await self.queue.put(task)
+        self.client = aiohttp.ClientSession()
+        for _signal in (SIGINT, SIGTERM):
+            self.loop.add_signal_handler(
+                _signal, lambda: asyncio.create_task(self._stop(_signal)))
+        await self._load_task()
         if self.queue.empty():
-            await self.start()
-        tasks = [asyncio.create_task(self._workflow(self.sem)) for _ in range(self.concurrency)]
+            async for task in self.start():
+                await self._add_task(task)
+        workers = [asyncio.create_task(self._workflow(self.sem)) for _ in range(self.concurrency)]
+        for worker in workers:
+            self.logger.info(f'Worker started: {id(worker)}')
         await self.queue.join()
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await self.client.close()
+        await self._cancel_tasks()
 
-    async def _redis_main(self):
-        self.logger.info('爬虫启动！！！！！')
-        self.queue = RedisQueue()
-        if self.queue.empty():
-            await self.start()
-        tasks = [asyncio.create_task(self._workflow(self.sem)) for _ in range(self.concurrency)]
-        await self.queue.join()
-        # for task in tasks:
-        #     task.cancel()
-        await asyncio.wait(tasks)
-
-    def _stop(self):
-        while True:
-            if self.queue.empty():
-                break
-            task = self.queue.get_nowait()
-            self.task_queue.append(task)
-            self.queue.task_done()
+    async def _stop(self, _signal):
+        await self.client.close()
+        self.logger.info(f"Stopping spider: {self.name}")
+        self._save_task()
+        await self._cancel_tasks()
 
     def stop(self):
         pass
 
-    def run(self):
-        try:
-            with open(f'{self.name}_dupe_tasks', 'rb') as f:
-                self.dupe_tasks = list(pickle.load(f))
-        except FileNotFoundError:
-            pass
-        try:
-            with open(f'{self.name}_task_queue', 'rb') as f:
-                self.task_queue = pickle.load(f)
-        except FileNotFoundError:
-            pass
+    @staticmethod
+    async def _cancel_tasks():
+        tasks = []
+        for task in asyncio.Task.all_tasks():
+            if task is not asyncio.tasks.Task.current_task():
+                tasks.append(task)
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
-        uvloop.install()
+    def _start(self):
         try:
-            if self.use_redis:
-                asyncio.run(self._redis_main())
-            else:
-                asyncio.run(self._memory_main())
+            asyncio.run(self._main())
         finally:
-            self.logger.info('爬虫关闭！！！！！')
-            with open(f'{self.name}_dupe_tasks', 'wb') as f:
-                pickle.dump(set(self.dupe_tasks), f)
-            with open(f'{self.name}_task_queue', 'wb') as f:
-                pickle.dump(self.task_queue, f)
-            if not self.use_redis:
-                self._stop()
+            self.logger.info('AioSpider Finished！！！！！')
+            self.logger.info(
+                f"Total requests: {self.failed_counts + self.success_counts}"
+            )
+            if self.failed_counts:
+                self.logger.info(f"Failed requests: {self.failed_counts}")
             self.stop()
+
+    @classmethod
+    def run(cls):
+        uvloop.install()
+        spider_ins = cls()
+        spider_ins._start()
+        return spider_ins
 
     async def parse(self, response):
         self.logger.info(response.doc('title').text())
         pass
 
-    async def result(self, result: Dict):
-        pass
+    async def _load_task(self):
+        try:
+            with open(f'{self.name}_dupe_tasks', 'rb') as f:
+                self.dupe_tasks = pickle.load(f)
+        except FileNotFoundError:
+            pass
+        try:
+            with open(f'{self.name}_tasks_queue', 'rb') as f:
+                self.tasks_queue = pickle.load(f)
+        except FileNotFoundError:
+            pass
+        if self.tasks_queue:
+            for task in self.tasks_queue:
+                await self._add_task(task)
+
+    def _save_task(self):
+        with open(f'{self.name}_dupe_tasks', 'wb') as f:
+            pickle.dump(self.dupe_tasks, f)
+
+        while True:
+            try:
+                task = self.queue.get_nowait()
+                self.tasks_queue.append(task)
+                self.queue.task_done()
+            except QueueEmpty:
+                break
+
+        with open(f'{self.name}_tasks_queue', 'wb') as f:
+            pickle.dump(self.tasks_queue, f)

@@ -4,7 +4,7 @@
 import asyncio
 from functools import wraps
 
-from utils.log import get_logger
+from aiospider.utils.log import get_logger
 
 logger = get_logger(name='Retrying')
 

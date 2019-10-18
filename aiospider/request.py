@@ -1,61 +1,62 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 # time    : 2019/10/10 3:46 下午
-import inspect
-import re
 from _sha256 import sha256
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Mapping, Union
 
 import ujson
+from aiohttp import BasicAuth, ClientTimeout
+from aiohttp.helpers import sentinel
+from aiohttp.typedefs import StrOrURL, LooseCookies, LooseHeaders
 from faker import Faker
-from httpx import QueryParamTypes, HeaderTypes, CookieTypes, AuthTypes, CertTypes, VerifyTypes, TimeoutTypes
-from httpx.models import ProxiesTypes, AsyncRequestData, URLTypes, RequestFiles
+
+from aiospider.exceptions import InvalidRequestMethod
+from aiospider.models import BaseTask
 
 fake = Faker(locale='zh_CN')
 
+METHOD = {'GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS', 'PATCH'}
 
-class Request:
-    def __init__(self, method: str, url: URLTypes, callback: str = None,
-                 data: AsyncRequestData = None,
+
+class Request(BaseTask):
+    def __init__(self, method: str, url: StrOrURL, callback: str = None,
+                 params: Optional[Mapping[str, str]] = None,
+                 data: Any = None,
+                 json: Any = None,
                  metadata: Optional[Dict] = None,
                  dont_filter: bool = False,
-                 priority: int = 1,
-                 params: QueryParamTypes = None,
-                 headers: HeaderTypes = None,
-                 cookies: CookieTypes = None,
-                 stream: bool = None,
-                 auth: AuthTypes = None,
+                 priority: int = 10,
+                 cookies: Optional[LooseCookies] = None,
+                 headers: LooseHeaders = None,
+                 auth: Optional[BasicAuth] = None,
                  allow_redirects: bool = True,
-                 cert: CertTypes = None,
-                 verify: VerifyTypes = None,
-                 timeout: TimeoutTypes = 20,
-                 trust_env: bool = None,
-                 proxies: ProxiesTypes = None,
-                 files=None,
-                 json: Any = None,
+                 max_redirects: int = 10,
+                 proxy: Optional[StrOrURL] = None,
+                 proxy_auth: Optional[BasicAuth] = None,
+                 timeout: Union[ClientTimeout, object] = sentinel,
+                 verify_ssl: Optional[bool] = None,
+                 etag:int=1
                  ):
-        self.method = method
+        super().__init__(priority, dont_filter)
+        self.method = method.upper()
+        if self.method not in METHOD:
+            raise InvalidRequestMethod(f"{self.method} method is not supported")
         self.url = url
         self.params = params
         self.data = data
-        self.headers = headers if headers else {'User-Agent': fake.chrome()}
+        self.headers = headers or {'User-Agent': fake.chrome()}
         self.cookies = cookies
         self.callback = callback
-        # self.dupe_str = self.to_dupe()
         self.metadata = metadata or {}
-        self.dont_filter = dont_filter
-        self.retries = 0
-        self.proxies = proxies
-        self.priority = priority
-        self.stream = stream
+        self.proxy = proxy
+        self.proxy_auth = proxy_auth
         self.auth = auth
         self.allow_redirects = allow_redirects
-        self.cert = cert
-        self.verify = verify
         self.timeout = timeout
-        self.trust_env = trust_env
-        self.files = files
         self.json = json
+        self.max_redirects = max_redirects
+        self.verify_ssl = verify_ssl
+        self.etag = etag
 
     @property
     def taskId(self) -> str:
@@ -75,32 +76,7 @@ class Request:
         return dupe_str.hexdigest()
 
     def __repr__(self):
-        return f'AioSpiderRequest<{self.method.upper()} {self.url} callback={self.callback}>'
+        return f'<AioSpiderRequest url[{self.method}]: {self.url} callback={self.callback}>'
 
     def __str__(self):
-        return f'AioSpiderRequest<{self.method.upper()} {self.url} callback={self.callback}>'
-
-    def __eq__(self, other):
-        if isinstance(other, Request):
-            return self.priority == other.priority
-        else:
-            raise TypeError(f'"==" not supported between instances of "Request" and "{type(other)}"')
-
-    def __lt__(self, other):
-        if isinstance(other, Request):
-            return self.priority < other.priority
-        else:
-            raise TypeError(f'"<" not supported between instances of "Request" and "{type(other)}"')
-
-    def __gt__(self, other):
-        if isinstance(other, Request):
-            return self.priority > other.priority
-        else:
-            raise TypeError(f'">" not supported between instances of "Request" and "{type(other)}"')
-
-    @staticmethod
-    def func_name(p):
-        for line in inspect.getframeinfo(inspect.currentframe().f_back)[3]:
-            m = re.search(r'func_name\((.*)\)', line)
-            if m:
-                return m.group(1)
+        return f'<AioSpiderRequest url[{self.method}]: {self.url} callback={self.callback}>'
