@@ -13,11 +13,12 @@ import aiohttp
 import uvloop
 from aiohttp import ClientResponse
 
-from aiospider.exceptions import InvalidFunc
+from aiospider.exceptions import InvalidFunc, InvalidParseMethod
 from aiospider.models import BaseTask
 from aiospider.request import Request
 from aiospider.response import Response
 from aiospider.utils.log import get_logger
+from aiospider.utils.retry import retry
 
 
 class AioSpider:
@@ -63,13 +64,16 @@ class AioSpider:
                     # if isinstance(task, Item):
                     #     await self._process_item(task)
                 except Exception as e:
+                    self.logger.exception(e)
                     raise e
                 finally:
                     self.queue.task_done()
                     await asyncio.sleep(self.request_delay)
 
     async def _process_request(self, request: Request):
+        # self.logger.debug(request)
         response = await self._request(request)
+        self.logger.debug(response)
         await self._add_task(response)
 
     async def _process_callback(self, response: Response):
@@ -106,7 +110,7 @@ class AioSpider:
             task = Request(method='get', url=url, callback='self.parse', dont_filter=True, priority=1)
             yield task
 
-    # @retry(Exception, sleep=retry_delay)
+    @retry(Exception, sleep=retry_delay)
     async def _request(self, task: Request) -> Response:
         async with self.client.request(
                 method=task.method,
@@ -121,8 +125,10 @@ class AioSpider:
                 max_redirects=task.max_redirects,
                 proxy=task.proxy,
                 proxy_auth=task.proxy_auth,
-                verify_ssl=task.verify_ssl
+                verify_ssl=task.verify_ssl,
+                ssl=task.ssl
         ) as resp:
+            # print(task)
             response = await self._process_response(resp, task)
             return response
 
@@ -184,7 +190,7 @@ class AioSpider:
 
     async def parse(self, response):
         self.logger.info(response.doc('title').text())
-        pass
+        raise InvalidParseMethod('请重载此方法')
 
     async def _load_task(self):
         try:

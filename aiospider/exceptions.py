@@ -14,3 +14,6 @@ class InvalidRequestMethod(Exception):
 class InvalidFunc(Exception):
     pass
 
+
+class InvalidParseMethod(Exception):
+    pass
