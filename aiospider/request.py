@@ -2,10 +2,11 @@
 # encoding: utf-8
 # time    : 2019/10/10 3:46 下午
 from _sha256 import sha256
+from ssl import SSLContext
 from typing import Optional, Dict, Any, Mapping, Union
 
 import ujson
-from aiohttp import BasicAuth, ClientTimeout
+from aiohttp import BasicAuth, ClientTimeout, Fingerprint
 from aiohttp.helpers import sentinel
 from aiohttp.typedefs import StrOrURL, LooseCookies, LooseHeaders
 from faker import Faker
@@ -35,6 +36,7 @@ class Request(BaseTask):
                  proxy_auth: Optional[BasicAuth] = None,
                  timeout: Union[ClientTimeout, object] = sentinel,
                  verify_ssl: Optional[bool] = None,
+                 ssl: Optional[Union[SSLContext, bool, Fingerprint]] = None,
                  etag: int = 1,
                  age: int = 60 * 60 * 24 * 2
                  ):
@@ -58,6 +60,7 @@ class Request(BaseTask):
         self.max_redirects = max_redirects
         self.verify_ssl = verify_ssl
         self.etag = etag
+        self.ssl = ssl
 
     @property
     def taskId(self) -> str:
