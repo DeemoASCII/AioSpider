@@ -6,7 +6,7 @@ from functools import wraps
 
 from aiospider.utils.log import get_logger
 
-logger = get_logger(name='Retrying')
+logger = get_logger(name='Retrying ')
 
 
 def retry(*exceptions, retries=5, sleep=2, verbose=True):
@@ -36,6 +36,7 @@ def retry(*exceptions, retries=5, sleep=2, verbose=True):
                         raise err
                     else:
                         verbose and logger.warning(message)
+                        logger.warning(err)
 
                     if sleep:
                         await asyncio.sleep(sleep)
