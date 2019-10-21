@@ -125,10 +125,10 @@ class Response(BaseTask):
         self.text = value
 
     def __repr__(self):
-        return f"<AioSpiderResponse url[{self._method}]: {self._url} status:{self._status}>"
+        return f"<AioSpiderResponse url[{self._method}]: {self._url} status:{self._status} callback: {self._callback}>"
 
     def __str__(self):
-        return f"<AioSpiderResponse url[{self._method}]: {self._url} status:{self._status}>"
+        return f"<AioSpiderResponse url[{self._method}]: {self._url} status:{self._status} callback: {self._callback}>"
 
     @property
     def doc(self) -> PyQuery:
