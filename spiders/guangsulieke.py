@@ -2,27 +2,23 @@
 # encoding: utf-8
 # time    : 2019/10/12 4:18 下午
 
-from aiohttp import BasicAuth
 from pyquery import PyQuery
-from urllib.request import quote
 
-from aiospider.aiospider import AioSpider
 from aiospider.request import Request
 from spiders.models import Job
+from spiders.zhaopin import ZPSpiders
 from utils.edu_dicts import DEGREE_NUMS
 
 gs_degree_map = {1: '初中', 2: '高中', 3: '中专', 4: '中专', 5: '专科', 6: '本科', 7: '硕士', 8: '博士', 9: 'MBA', 0: '不限'}
 
 
-class MiCaSpider(AioSpider):
+class GSLKSpider(ZPSpiders):
     name = '光速列客'
     start_urls = ['https://www.91lieke.com/api/pass/recruitment/1181762252382928896',
                   'https://www.91lieke.com/api/pass/recruitment/1181760245119057920',
                   'https://www.91lieke.com/api/pass/recruitment/1178460652839108608']
-    concurrency = 15
 
-    proxy = 'http://http-pro.abuyun.com:9010'
-    proxy_auth = BasicAuth('H1C874789LK67IJP', '5C00CC9500B2633F')
+    domain = 'guangsulieke20191014'
 
     async def parse(self, resp):
         if resp.ok:
@@ -53,34 +49,12 @@ class MiCaSpider(AioSpider):
             desc = PyQuery(desc).remove('style').text()
             j = resp.metadata
             j.update(description=desc)
-            task = Request(method='post', url='https://guangsulieke20191014.mesoor.com/api/jobs', json=j,
+            task = Request(method='post', url=f'https://{self.domain}.mesoor.com/api/jobs', json=j,
                            headers={
                                'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJpYXQiOjE1NjA4MjUyNzcsImV4cCI6MTYyMzg5NzI2NSwidXNlclJvbGUiOjB9.3q2HXTkXzoDNfyHIanl_c-SH0UMvjXVxAbAMAkIwSxY'
                            }, callback='self.create_job', metadata=j)
             yield task
 
-    async def create_job(self, resp):
-        if resp.ok:
-            self.logger.info('create_job:' + resp.text)
-            task = Request(method='put',
-                           url=f'https://guangsulieke20191014.mesoor.com/api/open-jobs/{quote(resp.metadata["openid"])}/agora/status?blackList=years&overwrite=true',
-                           json={"enabled": True}, headers={
-                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJpYXQiOjE1NjA4MjUyNzcsImV4cCI6MTYyMzg5NzI2NSwidXNlclJvbGUiOjB9.3q2HXTkXzoDNfyHIanl_c-SH0UMvjXVxAbAMAkIwSxY'
-                }, callback='self.create_agora')
-            yield task
-        else:
-            request = resp.request
-            request.dont_filter = True
-            yield request
-
-    async def create_agora(self, resp):
-        if resp.ok:
-            self.logger.info('create_agora:' + resp.text)
-        else:
-            request = resp.request
-            request.dont_filter = True
-            yield request
-
 
 if __name__ == '__main__':
-    MiCaSpider.run()
+    GSLKSpider.run()
