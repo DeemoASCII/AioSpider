@@ -6,6 +6,7 @@ import re
 from aleph.mappers.taggers.parsers import parse_salary_amount
 
 from spiders import loc_normalizer
+from spiders.edu_dicts import DEGREE_NORMALIZE, DEGREE_NUMS
 
 
 def parse_salary(text):
@@ -29,3 +30,25 @@ def parse_loc(loc):
         return [loc_id]
     else:
         return
+
+
+def parse_work_year(text):
+    if isinstance(text, str):
+        if re.search(r'\d+(?=年)?', text):
+            years = int(re.search(r'\d+(?=年)?', text).group())
+        else:
+            years = 0
+        return years
+    return text
+
+
+def parse_degree(text):
+    if not text:
+        return None
+    if '不限' in text:
+        return -4
+    for k, v in DEGREE_NORMALIZE.items():
+        if k in text:
+            degree = DEGREE_NUMS.get(v.strip(), -4)
+            return degree
+    return None
