@@ -118,7 +118,7 @@ class Response(BaseTask):
     @property
     def text(self) -> str:
         """Read response payload and decode."""
-        return self._content.decode(self._encoding)
+        return self._content.decode(self._encoding,errors='ignore')
 
     @text.setter
     def text(self, value):

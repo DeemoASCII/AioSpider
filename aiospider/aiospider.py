@@ -13,7 +13,8 @@ import aiohttp
 import uvloop
 from aiohttp import ClientResponse
 
-from aiospider.exceptions import InvalidFunc, InvalidParseMethod
+from aiospider.exceptions import InvalidFunc
+from aiospider.item import Item, Result
 from aiospider.models import BaseTask
 from aiospider.request import Request
 from aiospider.response import Response
@@ -61,8 +62,8 @@ class AioSpider:
                         await self._process_request(task)
                     if isinstance(task, Response):
                         await self._process_callback(task)
-                    # if isinstance(task, Item):
-                    #     await self._process_item(task)
+                    if isinstance(task, Result):
+                        await self._process_result(task)
                 except Exception as e:
                     self.logger.exception(e)
                     raise e
@@ -71,7 +72,7 @@ class AioSpider:
                     await asyncio.sleep(self.request_delay)
 
     async def _process_request(self, request: Request):
-        # self.logger.debug(request)
+        request = await self.request_middleware(request)
         response = await self._request(request)
         self.logger.debug(response)
         await self._add_task(response)
@@ -83,15 +84,24 @@ class AioSpider:
             if iscoroutine(callback_result):
                 result = await callback_result
                 if result:
+                    if isinstance(result, Item):
+                        result = await self._process_item(result, response)
                     await self._add_task(result)
             elif isasyncgen(callback_result):
                 async for each in func(response):
+                    if isinstance(each, Item):
+                        each = await self._process_item(each, response)
                     await self._add_task(each)
             else:
                 raise InvalidFunc(f'Invalid func type {type(callback_result)}')
 
-    # async def _process_item(self, item: Item):
-    #     pass
+    async def _process_item(self, item: Item, resp: Response):
+        result = Result(url=resp.url, item=item, priority=resp.priority - 5, dont_filter=resp.dont_filter, age=resp.age)
+        return result
+
+    async def _process_result(self, result):
+        item = result.item
+        await self.pipeline(item)
 
     async def _process_response(self, resp: ClientResponse, req: Request):
         content = await resp.read()
@@ -190,7 +200,7 @@ class AioSpider:
 
     async def parse(self, response):
         self.logger.info(response.doc('title').text())
-        raise InvalidParseMethod('请重载此方法')
+        raise NotImplementedError('parse is not implemented')
 
     async def _load_task(self):
         try:
@@ -221,3 +231,10 @@ class AioSpider:
 
         with open(f'{self.name}_tasks_queue', 'wb') as f:
             pickle.dump(self.tasks_queue, f)
+
+    async def pipeline(self, item):
+        pass
+
+    async def request_middleware(self, request):
+        pass
+        return request
