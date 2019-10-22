@@ -2,6 +2,7 @@
 # encoding: utf-8
 # time    : 2019/10/10 5:43 下午
 import asyncio
+from asyncio import CancelledError
 from functools import wraps
 
 from aiospider.utils.log import get_logger
@@ -28,6 +29,8 @@ def retry(*exceptions, retries=5, sleep=2, verbose=True):
                 try:
                     result = await func(*args, **kwargs)
                     break
+                except CancelledError:
+                    raise CancelledError
                 except exceptions as err:
                     retries_count += 1
                     message = f"Exception during {func} execution. {retries_count} of {retries} retries attempted"
