@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 # time    : 2019/10/18 11:46 上午
+from _sha256 import sha256
 
-from inspect import isawaitable
-from lxml import etree
-from typing import Any
+import ujson
 
-from aiospider.field import BaseField
+from aiospider.models import BaseTask
 
 
 class ItemMeta(type):
@@ -15,14 +14,11 @@ class ItemMeta(type):
     """
 
     def __new__(cls, name, bases, attrs):
-        __fields = dict(
-            {
-                (field_name, attrs.pop(field_name))
-                for field_name, object in list(attrs.items())
-                if isinstance(object, BaseField)
-            }
-        )
-        attrs["__fields"] = __fields
+        __fields = [field_name
+                    for field_name, _ in attrs.items()
+                    if not field_name.startswith('__') and not field_name.endswith('__')]
+
+        attrs["fields"] = __fields
         new_class = type.__new__(cls, name, bases, attrs)
         return new_class
 
@@ -32,4 +28,33 @@ class Item(metaclass=ItemMeta):
     Item class for each item
     """
 
-    pass
+    @property
+    def dict(self):
+        result = {}
+        for each in self.fields:
+            result[each] = eval(f'self.{each}')
+        return result
+
+    @dict.setter
+    def dict(self, value):
+        self.dict = value
+
+
+class Result(BaseTask):
+
+    def __init__(self, url, item, *, priority: int, dont_filter: bool = False, age: int = 3 * 60 * 60 * 24):
+        super().__init__(priority, dont_filter, age)
+        self.item = item
+        self.url = url
+
+    def __repr__(self):
+        return f"<AioSpiderResult from url: {self.url} >"
+
+    def __str__(self):
+        return f"<AioSpiderResult from url: {self.url} >"
+
+    @property
+    def taskId(self) -> str:
+        dupe_str = sha256()
+        dupe_str.update(ujson.dumps(self.item.dict).encode())
+        return dupe_str.hexdigest()
