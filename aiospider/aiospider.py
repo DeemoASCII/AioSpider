@@ -43,13 +43,7 @@ class AioSpider:
         self.success_counts = 0
 
     async def _add_task(self, task: BaseTask):
-        if task.dont_filter:
-            self.dupe_tasks.append(task.taskId)
-            await self.queue.put(task)
-        elif task.taskId not in self.dupe_tasks:
-            self.dupe_tasks.append(task.taskId)
-            await self.queue.put(task)
-        elif task.expire < int(time()):
+        if task.dont_filter or task.taskId not in self.dupe_tasks or 0 < task.expire < int(time()):
             self.dupe_tasks.append(task.taskId)
             await self.queue.put(task)
 
@@ -236,5 +230,5 @@ class AioSpider:
         pass
 
     async def request_middleware(self, request):
-        pass
+
         return request

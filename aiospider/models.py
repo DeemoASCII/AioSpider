@@ -64,7 +64,7 @@ class BaseTask:
 
     @property
     def expire(self) -> int:
-        return self.age + int(time())
+        return self.age + int(time()) if self.age > 0 else 0
 
     @expire.setter
     def expire(self, value: int):
