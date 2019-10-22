@@ -21,19 +21,15 @@ class Job(BaseModel):
     openid: str
     publish_date: Optional[str] = None
 
-    def to_dict(self):
-        return {
-            'name': self.name,
-            'description': self.description,
-            'address': self.address,
-            'employer': self.employer,
-            'headcount': self.headcount,
-            'years': self.years,
-            'degree': self.degree,
-            'salary_low': self.salary_low,
-            'salary_high': self.salary_high,
-            'location_ids': self.location_ids or None,
-            'status': self.status,
-            'openid': self.openid,
-            'publish_date': self.publish_date,
-        }
+    def job_validate(self):
+        try:
+            self.validate_employer()
+            return True
+        except AssertionError:
+            return False
+
+    def validate_employer(self):
+        assert len(self.employer) <= 64
+
+    def validate_name(self):
+        assert len(self.name) <= 64
