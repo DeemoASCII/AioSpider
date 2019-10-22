@@ -7,6 +7,7 @@ from aiohttp import BasicAuth
 
 from aiospider.aiospider import AioSpider
 from aiospider.request import Request
+from spiders.models import Job
 
 
 class ZPSpiders(AioSpider):
@@ -38,3 +39,10 @@ class ZPSpiders(AioSpider):
             request = resp.request
             request.dont_filter = True
             yield request
+
+    async def pipeline(self, item):
+        job = Job.parse_obj(item.dict)
+        if job.job_validate():
+            self.logger.info(job.dict())
+        else:
+            self.logger.warning('job validation failed, please check the job data')

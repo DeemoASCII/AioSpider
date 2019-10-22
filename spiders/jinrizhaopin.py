@@ -5,8 +5,7 @@ import re
 from urllib.parse import urlparse
 
 from aiospider.request import Request
-from spiders import parse_salary, parse_loc
-from spiders.edu_dicts import DEGREE_NORMALIZE, DEGREE_NUMS
+from spiders import parse_salary, parse_loc, parse_work_year, parse_degree
 from spiders.models import Job
 from spiders.zhaopin import ZPSpiders
 
@@ -58,18 +57,10 @@ class JRZPSpider(ZPSpiders):
             salary_low, salary_high = parse_salary(resp.doc('.zwm em').text() + '/月')
             items = resp.doc('.jbyq span')
             edu = items.eq(2).text()
-            degree = 0
-            for k, v in DEGREE_NORMALIZE.items():
-                if k in edu:
-                    degree = DEGREE_NUMS.get(v.strip(), -4)
             years = items.eq(1).text()
-            if re.search(r'\d+(?=年)', years):
-                years = int(re.search(r'\d+(?=年)', years).group())
-            else:
-                years = 0
-            job = Job(name=resp.doc('.zwjbnr .zwm span').text(), degree=degree,
+            job = Job(name=resp.doc('.zwjbnr .zwm span').text(), degree=parse_degree(edu),
                       salary_low=salary_low, salary_high=salary_high,
-                      location_ids=parse_loc(items.eq(0).text()), years=years,
+                      location_ids=parse_loc(items.eq(0).text()), years=parse_work_year(years),
                       description=resp.doc(
                           'body > div.main > div.m-con > div > div.mLeft.fl > div:nth-child(1) > div.zwmsCon').text(),
                       address=resp.doc('.gzddCon > span').text(),
