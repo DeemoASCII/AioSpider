@@ -46,3 +46,11 @@ class ZPSpiders(AioSpider):
             self.logger.info(job.dict())
         else:
             self.logger.warning('job validation failed, please check the job data')
+
+    async def request_middleware(self, request):
+        request.proxy = self.proxy
+        request.proxy_auth = self.proxy_auth
+        return request
+
+    async def tyc_search(self,resp):
+        request

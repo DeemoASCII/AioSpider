@@ -60,7 +60,7 @@ class YLYCSpider(ZPSpiders):
                 'page': 0
             }
             yield Request(method='post', url=self.base_url, params=params, callback='self.parse',
-                          priority=10, proxy=self.proxy, proxy_auth=self.proxy_auth, metadata=params)
+                          priority=10, metadata=params)
 
     async def parse(self, resp):
         if resp.ok:
@@ -73,13 +73,12 @@ class YLYCSpider(ZPSpiders):
             for item in doc('li > a').items():
                 count += 1
                 job_url = 'http:' + item.attr('href')
-                yield Request(method='get', url=job_url, callback='self.job_detail', priority=7,
-                              proxy=self.proxy, proxy_auth=self.proxy_auth)
+                yield Request(method='get', url=job_url, callback='self.job_detail', priority=7)
             if 'totalid' in resp.url:
                 if count >= 20:
                     params['page'] += 1
-                    yield Request(method='POST', url=self.base_url, params=params, callback='self.parse',
-                                  proxy=self.proxy, proxy_auth=self.proxy_auth, priority=10, metadata=params)
+                    yield Request(method='POST', url=self.base_url, params=params, callback='self.parse', priority=10,
+                                  metadata=params)
 
     async def job_detail(self, resp):
         if resp.ok:
@@ -87,8 +86,7 @@ class YLYCSpider(ZPSpiders):
             comp_url = resp.doc('.posit_detail').attr('href')
             job = parse_job_detail(resp)
             if comp_url:
-                yield Request(method='get', url='http:' + comp_url, callback='self.comp_detail',
-                              proxy=self.proxy, proxy_auth=self.proxy_auth, priority=5)
+                yield Request(method='get', url='http:' + comp_url, callback='self.comp_detail', priority=5)
             yield job
 
     async def comp_detail(self, resp):
@@ -99,7 +97,7 @@ class YLYCSpider(ZPSpiders):
             comp_id = re.search(r'(?<=companydetail_).*?(?=\.htm)', resp.url).group()
             yield Request(method='get',
                           url=f'http://m.job1001.com/company/ajax/?detail=getAllJobList&v=3.0&company_id={comp_id}',
-                          callback='self.parse', proxy=self.proxy, proxy_auth=self.proxy_auth, priority=3)
+                          callback='self.parse', priority=3)
 
 
 if __name__ == '__main__':
