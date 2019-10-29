@@ -4,7 +4,7 @@
 import asyncio
 import pickle
 from _signal import SIGINT, SIGTERM
-from asyncio import QueueEmpty
+from asyncio import QueueEmpty, CancelledError
 from inspect import isasyncgen, iscoroutine
 from time import time
 from typing import List, Optional
@@ -31,7 +31,7 @@ class AioSpider:
     concurrency = 10  # 控制并发
 
     ruler = {}
-
+    cookies = []
     retry_exceptions = []
 
     def __init__(self, name, ruler):
@@ -53,26 +53,27 @@ class AioSpider:
             self.dupe_tasks.append(task.taskId)
             await self.queue.put(task)
 
-    async def _workflow(self, sem):
+    async def _workflow(self, sem, cookie=None):
         async with sem:
             while True:
                 task = await self.queue.get()
                 try:
                     if isinstance(task, Request):
-                        await self._process_request(task)
+                        await self._process_request(task, cookie)
                     if isinstance(task, Response):
                         await self._process_callback(task)
                     if isinstance(task, Result):
                         await self._process_result(task)
+                except (KeyboardInterrupt, CancelledError) as e:
+                    raise e
                 except Exception as e:
                     self.logger.exception(e)
-                    raise e
                 finally:
                     self.queue.task_done()
                     await asyncio.sleep(self.request_delay)
 
-    async def _process_request(self, request: Request):
-        request = await self.request_middleware(request)
+    async def _process_request(self, request: Request, cookie=None):
+        request = await self.request_middleware(request, cookie)
         response = await self._request(request)
         self.logger.debug(response)
         await self._add_task(response)
@@ -154,7 +155,10 @@ class AioSpider:
         if self.queue.empty():
             async for task in self.start():
                 await self._add_task(task)
-        workers = [asyncio.create_task(self._workflow(self.sem)) for _ in range(self.concurrency)]
+        if self.cookies:
+            workers = [asyncio.create_task(self._workflow(self.sem, cookie)) for cookie in self.cookies]
+        else:
+            workers = [asyncio.create_task(self._workflow(self.sem)) for _ in range(self.concurrency)]
         for worker in workers:
             self.logger.info(f'Worker started: {id(worker)}')
         await self.queue.join()
@@ -235,6 +239,5 @@ class AioSpider:
     async def pipeline(self, item):
         pass
 
-    async def request_middleware(self, request):
-
+    async def request_middleware(self, request, cookie=None):
         return request
