@@ -3,7 +3,6 @@
 # time    : 2019/10/10 3:46 下午
 import re
 from _sha256 import sha256
-from http.cookies import SimpleCookie
 from typing import Dict, Optional
 
 import ujson
@@ -85,13 +84,11 @@ class Response(BaseTask):
 
     @property
     def cookies(self) -> dict:
-        if isinstance(self._cookies, SimpleCookie):
-            cur_cookies = {}
-            for key, value in self._cookies.items():
-                cur_cookies[key] = value.value
-            return cur_cookies
+        exit_cookies = self.request.cookies
+        if self._cookies:
+            return exit_cookies.update(dict(self._cookies))
         else:
-            return self._cookies
+            return exit_cookies
 
     @property
     def history(self):
@@ -113,12 +110,12 @@ class Response(BaseTask):
     def json(self):
         """Read and decodes JSON response."""
 
-        return ujson.loads(self.text) if 'application/json' in self._content_type else None
+        return ujson.loads(self.text)
 
     @property
     def text(self) -> str:
         """Read response payload and decode."""
-        return self._content.decode(self._encoding,errors='ignore')
+        return self._content.decode(self._encoding, errors='ignore')
 
     @text.setter
     def text(self, value):
