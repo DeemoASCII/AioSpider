@@ -39,6 +39,12 @@ class Item(metaclass=ItemMeta):
     def dict(self, value):
         self.dict = value
 
+    def __repr__(self):
+        return f"<AioSpiderItem {ujson.dumps(self.dict)}>"
+
+    def __str__(self):
+        return f"<AioSpiderItem {ujson.dumps(self.dict)}>"
+
 
 class Result(BaseTask):
 
