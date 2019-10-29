@@ -47,7 +47,7 @@ class Request(BaseTask):
         self.url = url
         self.params = params
         self.data = data
-        self.headers = headers or {'User-Agent': fake.chrome(), 'Accept-encoding': 'gzip, deflate, br'}
+        self.headers = headers or {'User-Agent': fake.chrome(), 'Accept-Encoding': 'gzip'}
         self.cookies = cookies
         self.callback = callback
         self.metadata = metadata or {}

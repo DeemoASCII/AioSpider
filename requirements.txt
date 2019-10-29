@@ -1,0 +1,10 @@
+ujson==1.35
+cchardet==2.1.4
+typing==3.7.4
+redis==3.3.10
+pydantic==0.29
+Faker==2.0.2
+uvloop==0.13.0
+setuptools==41.0.1
+aiohttp==3.5.4
+pyquery==1.4.0
