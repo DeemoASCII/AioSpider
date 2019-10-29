@@ -30,10 +30,16 @@ class AioSpider:
     use_redis = False
     concurrency = 10  # 控制并发
 
+    ruler = {}
+
     retry_exceptions = []
 
-    def __init__(self):
+    def __init__(self, name, ruler):
         self.queue = None
+        if name:
+            self.name = name
+        if ruler:
+            self.ruler = ruler
         self.client: Optional[aiohttp.ClientSession] = None
         self.dupe_tasks: List[str] = []
         self.logger = get_logger(name=self.name)
@@ -186,9 +192,9 @@ class AioSpider:
             self.stop()
 
     @classmethod
-    def run(cls):
+    def run(cls, name=None, ruler=None):
         uvloop.install()
-        spider_ins = cls()
+        spider_ins = cls(name=name, ruler=ruler)
         spider_ins._start()
         return spider_ins
 

@@ -47,7 +47,7 @@ class Request(BaseTask):
         self.url = url
         self.params = params
         self.data = data
-        self.headers = headers or {'User-Agent': fake.chrome()}
+        self.headers = headers or {'User-Agent': fake.chrome(), 'Accept-encoding': 'gzip, deflate, br'}
         self.cookies = cookies
         self.callback = callback
         self.metadata = metadata or {}
@@ -65,6 +65,7 @@ class Request(BaseTask):
     @property
     def taskId(self) -> str:
         dupe_str = sha256()
+        dupe_str.update(ujson.dumps(self.metadata).encode('utf-8'))
         if not self.params and not (self.data or self.json):
             dupe_str.update((self.method + self.url).encode('utf-8'))
         elif self.params and (self.data or self.json):
