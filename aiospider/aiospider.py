@@ -148,6 +148,7 @@ class AioSpider:
         self.loop = asyncio.get_event_loop()
         self.queue = asyncio.PriorityQueue(maxsize=1000000)
         self.client = aiohttp.ClientSession()
+        await self.before_start()
         for _signal in (SIGINT, SIGTERM):
             self.loop.add_signal_handler(
                 _signal, lambda: asyncio.create_task(self._stop(_signal)))
@@ -241,3 +242,6 @@ class AioSpider:
 
     async def request_middleware(self, request, cookie=None):
         return request
+
+    async def before_start(self):
+        pass
