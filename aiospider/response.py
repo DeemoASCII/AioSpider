@@ -43,12 +43,13 @@ class Response(BaseTask):
         self._headers = headers
         self._content_type = self._headers.get('Content-Type')
         self._status = status
-        self._ok = self._status == 0 or 200 <= self._status <= 299
-        self._request = request
         self._content = content
-        self._encoding = re.search(r'(?<=charset=).*',
-                                   self._content_type).group().lower() if 'charset' in self._content_type else detect(
-            content).get('encoding')
+        self._ok = self._content and 200 <= self._status <= 299
+        self._request = request
+        if self._content:
+            self._encoding = re.search(r'(?<=charset=).*',
+                                       self._content_type).group().lower() if 'charset' in self._content_type else detect(
+                content).get('encoding')
 
     @property
     def content(self):
