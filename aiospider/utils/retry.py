@@ -29,8 +29,8 @@ def retry(*exceptions, retries=5, sleep=2, verbose=True):
                 try:
                     result = await func(*args, **kwargs)
                     break
-                except CancelledError:
-                    raise CancelledError
+                except (KeyboardInterrupt, CancelledError) as e:
+                    raise e
                 except exceptions as err:
                     retries_count += 1
                     message = f"Exception during {func} execution. {retries_count} of {retries} retries attempted"

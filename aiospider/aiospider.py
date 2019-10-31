@@ -13,7 +13,7 @@ import aiohttp
 import uvloop
 from aiohttp import ClientResponse
 
-from aiospider.exceptions import InvalidFunc
+from aiospider.exceptions import InvalidFunc, RequestStatusError
 from aiospider.item import Item, Result
 from aiospider.models import BaseTask
 from aiospider.request import Request
@@ -139,7 +139,8 @@ class AioSpider:
                 verify_ssl=task.verify_ssl,
                 ssl=task.ssl
         ) as resp:
-            # print(task)
+            if resp.status >= 500 or 400 <= resp.status < 404:
+                raise RequestStatusError(f'response status code: {resp.status}')
             response = await self._process_response(resp, task)
             return response
 

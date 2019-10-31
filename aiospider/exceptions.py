@@ -17,3 +17,7 @@ class InvalidFunc(Exception):
 
 class InvalidParseMethod(Exception):
     pass
+
+
+class RequestStatusError(Exception):
+    pass

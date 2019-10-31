@@ -110,13 +110,15 @@ class Response(BaseTask):
     @property
     def json(self):
         """Read and decodes JSON response."""
-
         return ujson.loads(self.text)
 
     @property
-    def text(self) -> str:
+    def text(self) -> Optional[str]:
         """Read response payload and decode."""
-        return self._content.decode(self._encoding, errors='ignore')
+        if self._content:
+            return self._content.decode(self._encoding, errors='ignore')
+        else:
+            return None
 
     @text.setter
     def text(self, value):
@@ -131,10 +133,6 @@ class Response(BaseTask):
     @property
     def doc(self) -> PyQuery:
         return PyQuery(self.text) if 'application/json' not in self._content_type else None
-
-    @doc.setter
-    def doc(self, value):
-        self.doc = value
 
     @property
     def taskId(self):
