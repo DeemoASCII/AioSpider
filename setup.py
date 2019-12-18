@@ -8,7 +8,7 @@ import sys
 
 setup(
     name="AioSpider",
-    version="0.2.16",
+    version="0.2.20",
     author="yueyue",
     author_email="xxb1021054331@gmail.com",
     description="a crawl framework based on asyncio and aiohttp",

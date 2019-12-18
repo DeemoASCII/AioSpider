@@ -47,6 +47,8 @@ class AioSpider:
         self.tasks_queue: List[BaseTask] = []
         self.failed_counts = 0
         self.success_counts = 0
+        self.delay = 300
+        self.last_display = None
 
     async def _add_task(self, task: BaseTask):
         if task.dont_filter or task.taskId not in self.dupe_tasks or 0 < task.expire < int(time()):
@@ -56,6 +58,10 @@ class AioSpider:
     async def _workflow(self, sem, cookie=None):
         async with sem:
             while True:
+                if not self.last_display or self.last_display + self.delay < int(time()):
+                    self.last_display = int(time())
+                    self.logger.info(f'目前已经成功抓取了{self.success_counts}个页面！')
+                    self.logger.info(f'目前抓取失败的页面有{self.success_counts}个！')
                 task = await self.queue.get()
                 try:
                     if isinstance(task, Request):
@@ -74,6 +80,7 @@ class AioSpider:
 
     async def _process_request(self, request: Request, cookie=None):
         request = await self.request_middleware(request, cookie)
+        self.logger.debug(request)
         response = await self._request(request)
         self.logger.debug(response)
         await self._add_task(response)
