@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 # time    : 2019/10/10 1:45 下午
+
 import asyncio
 import pickle
-from _signal import SIGINT, SIGTERM
+from _signal import SIGINT, SIGTERM, SIGKILL
 from asyncio import QueueEmpty, CancelledError
 from inspect import isasyncgen, iscoroutine
 from time import time
@@ -26,7 +27,7 @@ class AioSpider:
     name: str = 'AioSpider'
     start_urls: List[str] = []
     request_delay: int = 0
-    retry_delay: int = 5
+    retry_delay: int = 2
     use_redis = False
     concurrency = 10  # 控制并发
 
@@ -61,7 +62,7 @@ class AioSpider:
                 if not self.last_display or self.last_display + self.delay < int(time()):
                     self.last_display = int(time())
                     self.logger.info(f'目前已经成功抓取了{self.success_counts}个页面！')
-                    self.logger.info(f'目前抓取失败的页面有{self.success_counts}个！')
+                    self.logger.info(f'目前抓取失败的页面有{self.failed_counts}个！')
                 task = await self.queue.get()
                 try:
                     if isinstance(task, Request):
@@ -157,10 +158,10 @@ class AioSpider:
         self.queue = asyncio.PriorityQueue(maxsize=1000000)
         self.client = aiohttp.ClientSession()
         await self.before_start()
-        for _signal in (SIGINT, SIGTERM):
+        for _signal in (SIGINT, SIGTERM, SIGKILL):
             self.loop.add_signal_handler(
                 _signal, lambda: asyncio.create_task(self._stop(_signal)))
-        await self._load_task()
+        # await self._load_task()
         if self.queue.empty():
             async for task in self.start():
                 await self._add_task(task)
@@ -171,16 +172,15 @@ class AioSpider:
         for worker in workers:
             self.logger.info(f'Worker started: {id(worker)}')
         await self.queue.join()
-        await self.client.close()
-        await self._cancel_tasks()
 
     async def _stop(self, _signal):
         await self.client.close()
         self.logger.info(f"Stopping spider: {self.name}")
-        self._save_task()
+        # self._save_task()
         await self._cancel_tasks()
+        await self.stop()
 
-    def stop(self):
+    async def stop(self):
         pass
 
     @staticmethod
@@ -202,7 +202,6 @@ class AioSpider:
             )
             if self.failed_counts:
                 self.logger.info(f"Failed requests: {self.failed_counts}")
-            self.stop()
 
     @classmethod
     def run(cls, name=None, ruler=None):
