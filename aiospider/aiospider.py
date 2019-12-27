@@ -4,7 +4,7 @@
 
 import asyncio
 import pickle
-from _signal import SIGINT, SIGTERM, SIGKILL
+from _signal import SIGINT, SIGTERM
 from asyncio import QueueEmpty, CancelledError
 from inspect import isasyncgen, iscoroutine
 from time import time
@@ -158,7 +158,7 @@ class AioSpider:
         self.queue = asyncio.PriorityQueue(maxsize=1000000)
         self.client = aiohttp.ClientSession()
         await self.before_start()
-        for _signal in (SIGINT, SIGTERM, SIGKILL):
+        for _signal in (SIGINT, SIGTERM):
             self.loop.add_signal_handler(
                 _signal, lambda: asyncio.create_task(self._stop(_signal)))
         # await self._load_task()
@@ -169,13 +169,12 @@ class AioSpider:
             workers = [asyncio.create_task(self._workflow(self.sem, cookie)) for cookie in self.cookies]
         else:
             workers = [asyncio.create_task(self._workflow(self.sem)) for _ in range(self.concurrency)]
-        for worker in workers:
-            self.logger.info(f'Worker started: {id(worker)}')
         await self.queue.join()
+        await self._stop(SIGTERM)
 
     async def _stop(self, _signal):
         await self.client.close()
-        self.logger.info(f"Stopping spider: {self.name}")
+        self.logger.info(f"Stopping spider: {self.name} with {_signal}")
         # self._save_task()
         await self._cancel_tasks()
         await self.stop()

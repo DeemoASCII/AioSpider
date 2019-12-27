@@ -8,11 +8,11 @@ import sys
 
 setup(
     name="AioSpider",
-    version="0.2.21",
+    version="0.2.24",
     author="yueyue",
     author_email="xxb1021054331@gmail.com",
     description="a crawl framework based on asyncio and aiohttp",
-    long_description=open("README.rst").read(),
+    long_description=open("README.md").read(),
     packages=find_packages(exclude='spiders'),
     zip_safe=True,
     install_requires=[
