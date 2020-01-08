@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 # time    : 2019/10/10 3:46 下午
+import json
 import re
 from _sha256 import sha256
 from typing import Dict, Optional
 
-import ujson
 from cchardet import detect
 from pyquery import PyQuery
 
@@ -110,7 +110,7 @@ class Response(BaseTask):
     @property
     def json(self):
         """Read and decodes JSON response."""
-        return ujson.loads(self.text)
+        return json.loads(self.content)
 
     @property
     def text(self) -> Optional[str]:
