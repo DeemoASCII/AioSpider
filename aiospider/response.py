@@ -132,7 +132,7 @@ class Response(BaseTask):
 
     @property
     def doc(self) -> PyQuery:
-        return PyQuery(self.text) if 'application/json' not in self._content_type else None
+        return PyQuery(self.text).make_links_absolute(self._url) if 'application/json' not in self._content_type else None
 
     @property
     def taskId(self):
