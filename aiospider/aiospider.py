@@ -4,6 +4,7 @@
 
 import asyncio
 import pickle
+import platform
 from _signal import SIGINT, SIGTERM
 from asyncio import QueueEmpty, CancelledError
 from inspect import isasyncgen, iscoroutine
@@ -11,7 +12,7 @@ from time import time
 from typing import List, Optional
 
 import aiohttp
-import uvloop
+
 from aiohttp import ClientResponse
 
 from aiospider.exceptions import InvalidFunc, RequestStatusError
@@ -21,6 +22,15 @@ from aiospider.request import Request
 from aiospider.response import Response
 from aiospider.utils.log import get_logger
 from aiospider.utils.retry import retry
+
+if platform.system() != 'Windows':
+    try:
+        import uvloop
+
+        uvloop.install()
+    except Exception as e:
+        print('请安装 uvloop 来使用更好的循环 “pip install uvloop”')
+        print(e)
 
 
 class AioSpider:
@@ -204,7 +214,6 @@ class AioSpider:
 
     @classmethod
     def run(cls, name=None, ruler=None):
-        uvloop.install()
         spider_ins = cls(name=name, ruler=ruler)
         spider_ins._start()
         return spider_ins
