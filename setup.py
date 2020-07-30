@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="AioSpider",
-    version="0.2.27",
+    version="0.2.28",
     author="yueyue",
     author_email="xxb1021054331@gmail.com",
     description="a crawl framework based on asyncio and aiohttp",

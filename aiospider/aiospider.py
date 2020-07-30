@@ -45,7 +45,7 @@ class AioSpider:
     cookies = []
     retry_exceptions = []
 
-    def __init__(self, name, ruler):
+    def __init__(self, name=None, ruler=None):
         self.queue = None
         if name:
             self.name = name
@@ -218,7 +218,7 @@ class AioSpider:
         spider_ins._start()
         return spider_ins
 
-    async def parse(self, response):
+    async def parse(self, response: Response):
         self.logger.info(response.doc('title').text())
         raise NotImplementedError('parse is not implemented')
 
