@@ -14,9 +14,10 @@ class ItemMeta(type):
     """
 
     def __new__(cls, name, bases, attrs):
-        __fields = [field_name
-                    for field_name, _ in attrs.items()
-                    if not field_name.startswith('__') and not field_name.endswith('__')]
+        __fields = []
+        if annotations := attrs.get('__annotations__'):
+            __fields = [field_name
+                        for field_name, _ in annotations.items()]
 
         attrs["fields"] = __fields
         new_class = type.__new__(cls, name, bases, attrs)
@@ -40,10 +41,10 @@ class Item(metaclass=ItemMeta):
         self.dict = value
 
     def __repr__(self):
-        return f"<AioSpiderItem {ujson.dumps(self.dict)}>"
+        return f"<AioSpiderItem {ujson.dumps(self.dict, ensure_ascii=False)}>"
 
     def __str__(self):
-        return f"<AioSpiderItem {ujson.dumps(self.dict)}>"
+        return f"<AioSpiderItem {ujson.dumps(self.dict, ensure_ascii=False)}>"
 
 
 class Result(BaseTask):

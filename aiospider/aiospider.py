@@ -12,12 +12,12 @@ from time import time
 from typing import List, Optional
 
 import aiohttp
-
 from aiohttp import ClientResponse
 
 from aiospider.exceptions import InvalidFunc, RequestStatusError
 from aiospider.item import Item, Result
 from aiospider.models import BaseTask
+from aiospider.pipeline import Pipeline, Mongo
 from aiospider.request import Request
 from aiospider.response import Response
 from aiospider.utils.log import get_logger
@@ -33,7 +33,7 @@ if platform.system() != 'Windows':
         print(e)
 
 
-class AioSpider:
+class AioSpider(Pipeline):
     name: str = 'AioSpider'
     start_urls: List[str] = []
     request_delay: int = 0
@@ -41,16 +41,15 @@ class AioSpider:
     use_redis = False
     concurrency = 10  # 控制并发
 
-    ruler = {}
+    broken_type: Optional[int] = 0
+    broken_url: Optional[str] = 'mongodb://localhost:27017'
+
     cookies = []
     retry_exceptions = []
 
-    def __init__(self, name=None, ruler=None):
+    def __init__(self, loop=None, **kwargs):
+        super().__init__(loop=loop, **kwargs)
         self.queue = None
-        if name:
-            self.name = name
-        if ruler:
-            self.ruler = ruler
         self.client: Optional[aiohttp.ClientSession] = None
         self.dupe_tasks: List[str] = []
         self.logger = get_logger(name=self.name)
@@ -60,6 +59,8 @@ class AioSpider:
         self.success_counts = 0
         self.delay = 300
         self.last_display = None
+        self.loop = loop
+        asyncio.set_event_loop(self.loop)
 
     async def _add_task(self, task: BaseTask):
         if task.dont_filter or task.taskId not in self.dupe_tasks or 0 < task.expire < int(time()):
@@ -164,7 +165,6 @@ class AioSpider:
 
     async def _main(self):
         self.logger.info('AioSpider started！！！！！Use memory queue..')
-        self.loop = asyncio.get_event_loop()
         self.queue = asyncio.PriorityQueue(maxsize=1000000)
         self.client = aiohttp.ClientSession()
         await self.before_start()
@@ -201,21 +201,27 @@ class AioSpider:
                 task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    def _start(self):
-        try:
-            asyncio.run(self._main())
-        finally:
-            self.logger.info('AioSpider Finished！！！！！')
-            self.logger.info(
-                f"Total requests: {self.failed_counts + self.success_counts}"
-            )
-            if self.failed_counts:
-                self.logger.info(f"Failed requests: {self.failed_counts}")
+    # def _start(self):
+    #     try:
+    #         asyncio.run(self._main())
+    #     finally:
+    #         self.logger.info('AioSpider Finished！！！！！')
+    #         self.logger.info(
+    #             f"Total requests: {self.failed_counts + self.success_counts}"
+    #         )
+    #         if self.failed_counts:
+    #             self.logger.info(f"Failed requests: {self.failed_counts}")
 
     @classmethod
-    def run(cls, name=None, ruler=None):
-        spider_ins = cls(name=name, ruler=ruler)
-        spider_ins._start()
+    def run(cls, loop=None, **spider_kwargs):
+        loop = loop or asyncio.new_event_loop()
+        spider_ins = cls(loop=loop, **spider_kwargs)
+
+        # Actually start crawling
+        spider_ins.loop.run_until_complete(
+            spider_ins._main()
+        )
+        spider_ins.loop.run_until_complete(spider_ins.loop.shutdown_asyncgens())
         return spider_ins
 
     async def parse(self, response: Response):
@@ -253,7 +259,10 @@ class AioSpider:
             pickle.dump(self.tasks_queue, f)
 
     async def pipeline(self, item):
-        pass
+        if self.broken_type == Mongo:
+            await self.mongo_insert(item.dict)
+        else:
+            raise NotImplementedError('pipeline is not implemented')
 
     async def request_middleware(self, request, cookie=None):
         return request

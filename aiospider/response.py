@@ -52,7 +52,7 @@ class Response(BaseTask):
                 content).get('encoding')
 
     @property
-    def content(self):
+    def content(self) -> bytes:
         return self._content
 
     @property
@@ -68,26 +68,27 @@ class Response(BaseTask):
         self._ok = value
 
     @property
-    def encoding(self):
+    def encoding(self) -> str:
         return self._encoding
 
     @property
-    def url(self):
+    def url(self) -> str:
         return self._url
 
     @property
-    def method(self):
+    def method(self) -> str:
         return self._method
 
     @property
-    def metadata(self):
+    def metadata(self) -> dict:
         return self._metadata
 
     @property
     def cookies(self) -> dict:
         exit_cookies = self.request.cookies
         if self._cookies:
-            return exit_cookies.update(dict(self._cookies))
+            exit_cookies.update(dict(self._cookies))
+            return exit_cookies
         else:
             return exit_cookies
 
@@ -96,19 +97,19 @@ class Response(BaseTask):
         return self._history
 
     @property
-    def headers(self):
+    def headers(self) -> dict:
         return self._headers
 
     @property
-    def status(self):
+    def status(self) -> int:
         return self._status
 
     @property
-    def request(self):
+    def request(self) -> Request:
         return self._request
 
     @property
-    def json(self):
+    def json(self) -> dict:
         """Read and decodes JSON response."""
         return json.loads(self.content)
 
